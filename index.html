@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Favicon Creator</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        margin-bottom: 20px;
+        transition: border-color 0.3s;
+      }
+      .upload-area:hover {
+        border-color: #007bff;
+      }
+      .upload-area.dragover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      .upload-btn {
+        background: #007bff;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .upload-btn:hover {
+        background: #0056b3;
+      }
+      .canvas-container {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+      .canvas-wrapper {
+        text-align: center;
+      }
+      canvas {
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        cursor: crosshair;
+      }
+      .controls {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+      }
+      label {
+        font-weight: bold;
+        color: #555;
+      }
+      input[type="range"] {
+        width: 120px;
+      }
+      .btn {
+        background: #28a745;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .btn:hover {
+        background: #218838;
+      }
+      .btn-secondary {
+        background: #6c757d;
+      }
+      .btn-secondary:hover {
+        background: #5a6268;
+      }
+      .download-link {
+        display: inline-block;
+        background: #dc3545;
+        color: white;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 6px;
+        margin: 10px;
+      }
+      .download-link:hover {
+        background: #c82333;
+      }
+      .hidden {
+        display: none;
+      }
+      .instructions {
+        background: #e9ecef;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Favicon Creator</h1>
+
+      <div class="instructions">
+        <strong>Instructions:</strong>
+        <ol>
+          <li>Upload your image using the button below</li>
+          <li>
+            Click and drag on the preview to select the area you want to keep
+          </li>
+          <li>Adjust the crop area and zoom as needed</li>
+          <li>Click "Generate Favicon" to create your 32x32 favicon</li>
+          <li>Download the result</li>
+        </ol>
+      </div>
+
+      <div class="upload-area" id="uploadArea">
+        <p>Click to upload your image or drag and drop it here</p>
+        <button
+          class="upload-btn"
+          onclick="document.getElementById('fileInput').click()"
+        >
+          Choose Image
+        </button>
+        <input type="file" id="fileInput" accept="image/*" />
+      </div>
+
+      <div id="canvasSection" class="hidden">
+        <div class="controls">
+          <div class="control-group">
+            <label for="zoomSlider">Zoom</label>
+            <input
+              type="range"
+              id="zoomSlider"
+              min="0.5"
+              max="3"
+              step="0.1"
+              value="1"
+            />
+          </div>
+          <button class="btn btn-secondary" onclick="resetCrop()">
+            Reset Crop
+          </button>
+          <button class="btn" onclick="generateFavicon()">
+            Generate Favicon
+          </button>
+        </div>
+
+        <div class="canvas-container">
+          <div class="canvas-wrapper">
+            <h3>Original Image</h3>
+            <canvas id="originalCanvas" width="400" height="400"></canvas>
+          </div>
+          <div class="canvas-wrapper">
+            <h3>32x32 Favicon Preview</h3>
+            <canvas id="faviconCanvas" width="128" height="128"></canvas>
+            <p style="font-size: 12px; color: #666">
+              (Shown at 4x size for visibility)
+            </p>
+          </div>
+        </div>
+
+        <div id="downloadSection" class="hidden" style="text-align: center">
+          <a id="downloadLink" class="download-link" download="favicon.png"
+            >Download Favicon</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let originalCanvas = document.getElementById("originalCanvas");
+      let faviconCanvas = document.getElementById("faviconCanvas");
+      let originalCtx = originalCanvas.getContext("2d");
+      let faviconCtx = faviconCanvas.getContext("2d");
+
+      let image = new Image();
+      let isDragging = false;
+      let startX, startY;
+      let cropX = 0,
+        cropY = 0,
+        cropWidth = 200,
+        cropHeight = 200;
+      let zoom = 1;
+
+      // File input handling
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", handleFile);
+
+      // Drag and drop handling
+      let uploadArea = document.getElementById("uploadArea");
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
+
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        let files = e.dataTransfer.files;
+        if (files.length > 0) {
+          loadImage(files[0]);
+        }
+      });
+
+      // Zoom slider
+      document.getElementById("zoomSlider").addEventListener("input", (e) => {
+        zoom = parseFloat(e.target.value);
+        drawOriginal();
+      });
+
+      // Mouse events for cropping
+      originalCanvas.addEventListener("mousedown", startCrop);
+      originalCanvas.addEventListener("mousemove", updateCrop);
+      originalCanvas.addEventListener("mouseup", endCrop);
+
+      function handleFile(e) {
+        let file = e.target.files[0];
+        if (file) {
+          loadImage(file);
+        }
+      }
+
+      function loadImage(file) {
+        let reader = new FileReader();
+        reader.onload = function (e) {
+          image.onload = function () {
+            document.getElementById("canvasSection").classList.remove("hidden");
+            resetCrop();
+            drawOriginal();
+          };
+          image.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function drawOriginal() {
+        originalCtx.clearRect(
+          0,
+          0,
+          originalCanvas.width,
+          originalCanvas.height
+        );
+
+        let scale =
+          Math.min(
+            originalCanvas.width / image.width,
+            originalCanvas.height / image.height
+          ) * zoom;
+        let x = (originalCanvas.width - image.width * scale) / 2;
+        let y = (originalCanvas.height - image.height * scale) / 2;
+
+        originalCtx.drawImage(
+          image,
+          x,
+          y,
+          image.width * scale,
+          image.height * scale
+        );
+
+        // Draw crop rectangle
+        originalCtx.strokeStyle = "#007bff";
+        originalCtx.lineWidth = 2;
+        originalCtx.strokeRect(cropX, cropY, cropWidth, cropHeight);
+
+        // Draw corner handles
+        originalCtx.fillStyle = "#007bff";
+        let handleSize = 8;
+        originalCtx.fillRect(
+          cropX - handleSize / 2,
+          cropY - handleSize / 2,
+          handleSize,
+          handleSize
+        );
+        originalCtx.fillRect(
+          cropX + cropWidth - handleSize / 2,
+          cropY - handleSize / 2,
+          handleSize,
+          handleSize
+        );
+        originalCtx.fillRect(
+          cropX - handleSize / 2,
+          cropY + cropHeight - handleSize / 2,
+          handleSize,
+          handleSize
+        );
+        originalCtx.fillRect(
+          cropX + cropWidth - handleSize / 2,
+          cropY + cropHeight - handleSize / 2,
+          handleSize,
+          handleSize
+        );
+      }
+
+      function startCrop(e) {
+        let rect = originalCanvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        isDragging = true;
+
+        cropX = startX;
+        cropY = startY;
+        cropWidth = 0;
+        cropHeight = 0;
+      }
+
+      function updateCrop(e) {
+        if (!isDragging) return;
+
+        let rect = originalCanvas.getBoundingClientRect();
+        let currentX = e.clientX - rect.left;
+        let currentY = e.clientY - rect.top;
+
+        cropWidth = currentX - startX;
+        cropHeight = currentY - startY;
+
+        // Make it square
+        let size = Math.min(Math.abs(cropWidth), Math.abs(cropHeight));
+        cropWidth = cropWidth < 0 ? -size : size;
+        cropHeight = cropHeight < 0 ? -size : size;
+
+        if (cropWidth < 0) {
+          cropX = startX + cropWidth;
+          cropWidth = Math.abs(cropWidth);
+        }
+        if (cropHeight < 0) {
+          cropY = startY + cropHeight;
+          cropHeight = Math.abs(cropHeight);
+        }
+
+        drawOriginal();
+      }
+
+      function endCrop() {
+        isDragging = false;
+        if (cropWidth < 10 || cropHeight < 10) {
+          resetCrop();
+        }
+      }
+
+      function resetCrop() {
+        cropX = originalCanvas.width / 2 - 100;
+        cropY = originalCanvas.height / 2 - 100;
+        cropWidth = 200;
+        cropHeight = 200;
+        drawOriginal();
+      }
+
+      function generateFavicon() {
+        // Create a temporary canvas to extract the cropped area
+        let tempCanvas = document.createElement("canvas");
+        let tempCtx = tempCanvas.getContext("2d");
+
+        // Calculate the actual image coordinates
+        let scale =
+          Math.min(
+            originalCanvas.width / image.width,
+            originalCanvas.height / image.height
+          ) * zoom;
+        let offsetX = (originalCanvas.width - image.width * scale) / 2;
+        let offsetY = (originalCanvas.height - image.height * scale) / 2;
+
+        let actualCropX = (cropX - offsetX) / scale;
+        let actualCropY = (cropY - offsetY) / scale;
+        let actualCropSize = cropWidth / scale;
+
+        tempCanvas.width = actualCropSize;
+        tempCanvas.height = actualCropSize;
+
+        tempCtx.drawImage(
+          image,
+          actualCropX,
+          actualCropY,
+          actualCropSize,
+          actualCropSize,
+          0,
+          0,
+          actualCropSize,
+          actualCropSize
+        );
+
+        // Draw the 32x32 favicon (displayed at 128x128 for visibility)
+        faviconCtx.imageSmoothingEnabled = true;
+        faviconCtx.imageSmoothingQuality = "high";
+        faviconCtx.clearRect(0, 0, faviconCanvas.width, faviconCanvas.height);
+        faviconCtx.drawImage(tempCanvas, 0, 0, 128, 128);
+
+        // Create actual 32x32 version for download
+        let actualFaviconCanvas = document.createElement("canvas");
+        actualFaviconCanvas.width = 32;
+        actualFaviconCanvas.height = 32;
+        let actualFaviconCtx = actualFaviconCanvas.getContext("2d");
+        actualFaviconCtx.imageSmoothingEnabled = true;
+        actualFaviconCtx.imageSmoothingQuality = "high";
+        actualFaviconCtx.drawImage(tempCanvas, 0, 0, 32, 32);
+
+        // Create download link
+        actualFaviconCanvas.toBlob(function (blob) {
+          let url = URL.createObjectURL(blob);
+          let downloadLink = document.getElementById("downloadLink");
+          downloadLink.href = url;
+          document.getElementById("downloadSection").classList.remove("hidden");
+        }, "image/png");
+      }
+    </script>
+  </body>
+</html>
